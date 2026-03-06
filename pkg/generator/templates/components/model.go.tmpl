@@ -1,0 +1,12 @@
+package models
+
+type {{.Name}} struct {
+	ID        int    `gorm:"primaryKey"`
+	Name      string
+	CreatedAt int64
+	UpdatedAt int64
+}
+
+func ({{.Name}}) TableName() string {
+	return "{{.PackageName}}s"
+}

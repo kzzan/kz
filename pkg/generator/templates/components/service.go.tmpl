@@ -1,0 +1,49 @@
+package services
+
+import (
+	"context"
+
+	"models"
+	"pkg/queue"
+	"repositories"
+)
+
+type {{.Name}}Service struct {
+	repo  *repositories.{{.Name}}Repository
+	queue queue.Queue
+}
+
+func New{{.Name}}Service(repo *repositories.{{.Name}}Repository, queue queue.Queue) *{{.Name}}Service {
+	return &{{.Name}}Service{repo: repo, queue: queue}
+}
+
+func (s *{{.Name}}Service) Create(ctx context.Context, item *models.{{.Name}}) error {
+	if err := s.repo.Create(ctx, item); err != nil {
+		return err
+	}
+	// 发布创建事件（异步处理：发通知、写日志等）
+	_ = s.queue.Publish(ctx, "{{.SnakeName}}.created", item)
+	return nil
+}
+
+func (s *{{.Name}}Service) Get(ctx context.Context, id int) (*models.{{.Name}}, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *{{.Name}}Service) Update(ctx context.Context, item *models.{{.Name}}) error {
+	if err := s.repo.Update(ctx, item); err != nil {
+		return err
+	}
+	// 发布更新事件
+	_ = s.queue.Publish(ctx, "{{.SnakeName}}.updated", item)
+	return nil
+}
+
+func (s *{{.Name}}Service) Delete(ctx context.Context, id int) error {
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	// 发布删除事件
+	_ = s.queue.Publish(ctx, "{{.SnakeName}}.deleted", map[string]int{"id": id})
+	return nil
+}

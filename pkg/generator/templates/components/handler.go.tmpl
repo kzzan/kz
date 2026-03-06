@@ -1,0 +1,17 @@
+package handlers
+
+import "github.com/gin-gonic/gin"
+
+type {{.Name}}Handler struct{}
+
+func New{{.Name}}Handler() *{{.Name}}Handler {
+	return &{{.Name}}Handler{}
+}
+
+func (h *{{.Name}}Handler) Get(c *gin.Context) {
+	c.JSON(200, gin.H{"message": "{{.Name}} Get"})
+}
+
+func (h *{{.Name}}Handler) Create(c *gin.Context) {
+	c.JSON(201, gin.H{"message": "{{.Name}} Created"})
+}
