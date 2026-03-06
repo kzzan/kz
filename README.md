@@ -1,4 +1,4 @@
-# mk
+# kz
 
 [![Tests](https://github.com/kzzan/kz/actions/workflows/test.yml/badge.svg)](https://github.com/kzzan/kz/actions/workflows/test.yml)
 [![Lint](https://github.com/kzzan/kz/actions/workflows/lint.yml/badge.svg)](https://github.com/kzzan/kz/actions/workflows/lint.yml)
@@ -28,24 +28,24 @@ export PATH=$PATH:$(go env GOPATH)/bin
 
 ```bash
 # 1. 创建新项目
-mk new myapp
+kz new myapp
 cd myapp
 
 # 2. 安装依赖
 go mod tidy
 
 # 3. 一键生成完整四层组件
-mk new all order
+kz new all order
 ```
 
 ---
 
 ## 命令一览
 
-### `mk new [project-name]` — 创建新项目
+### `kz new [project-name]` — 创建新项目
 
 ```bash
-mk new myapp
+kz new myapp
 ```
 
 在当前目录生成完整项目骨架，包含：
@@ -58,10 +58,10 @@ mk new myapp
 
 ---
 
-### `mk new all [name]` — 生成完整四层组件
+### `kz new all [name]` — 生成完整四层组件
 
 ```bash
-mk new all order
+kz new all order
 ```
 
 一条命令完成 8 个步骤：
@@ -79,10 +79,10 @@ mk new all order
 
 ---
 
-### `mk new handler [name]` — 单独生成 Handler
+### `kz new handler [name]` — 单独生成 Handler
 
 ```bash
-mk new handler order
+kz new handler order
 ```
 
 - 生成 `internal/handler/order.go`
@@ -92,10 +92,10 @@ mk new handler order
 
 ---
 
-### `mk new service [name]` — 单独生成 Service
+### `kz new service [name]` — 单独生成 Service
 
 ```bash
-mk new service order
+kz new service order
 ```
 
 - 生成 `internal/service/order.go`
@@ -103,10 +103,10 @@ mk new service order
 
 ---
 
-### `mk new repo [name]` — 单独生成 Repository
+### `kz new repo [name]` — 单独生成 Repository
 
 ```bash
-mk new repo order
+kz new repo order
 ```
 
 - 生成 `internal/repository/order.go`
@@ -114,10 +114,10 @@ mk new repo order
 
 ---
 
-### `mk new model [name]` — 生成 Model
+### `kz new model [name]` — 生成 Model
 
 ```bash
-mk new model order
+kz new model order
 ```
 
 - 生成 `internal/models/order.go`
@@ -125,10 +125,10 @@ mk new model order
 
 ---
 
-### `mk new cron [name]` — 生成定时任务
+### `kz new cron [name]` — 生成定时任务
 
 ```bash
-mk new cron cleanExpired
+kz new cron cleanExpired
 ```
 
 - 生成 `internal/cron/clean_expired.go`（默认 `@every 1m`）
@@ -143,10 +143,10 @@ scheduler.Start()
 
 ---
 
-### `mk new consumer [name]` — 生成消息队列消费者
+### `kz new consumer [name]` — 生成消息队列消费者
 
 ```bash
-mk new consumer orderPaid
+kz new consumer orderPaid
 ```
 
 - 生成 `internal/consumer/order_paid.go`（含 Topic / Start / handle 方法）
@@ -161,10 +161,10 @@ manager.Start(ctx)
 
 ---
 
-### `mk new middleware [name]` — 生成中间件
+### `kz new middleware [name]` — 生成中间件
 
 ```bash
-mk new middleware rateLimit
+kz new middleware rateLimit
 ```
 
 - 生成 `internal/middleware/rate_limit.go` 空模板
@@ -211,7 +211,7 @@ myapp/
 
 ## 命名规则
 
-mk 支持任意大小写风格输入，自动转换：
+kz 支持任意大小写风格输入，自动转换：
 
 | 输入 | 生成文件 | 结构体名 |
 |------|---------|---------|
