@@ -27,9 +27,7 @@ func ToCamelCase(input string) string {
 	return toCamelCase(input, false)
 }
 
-// toCamelCase 内部驼峰转换函数
 func toCamelCase(input string, isPascal bool) string {
-	// 替换分隔符为空格用于处理
 	normalized := strings.NewReplacer(
 		"-", " ",
 		"_", " ",
@@ -37,7 +35,6 @@ func toCamelCase(input string, isPascal bool) string {
 		".", " ",
 	).Replace(input)
 
-	// 分割字符串
 	words := strings.Fields(normalized)
 
 	if len(words) == 0 {
@@ -47,10 +44,8 @@ func toCamelCase(input string, isPascal bool) string {
 	result := ""
 	for i, word := range words {
 		if i == 0 && !isPascal {
-			// camelCase 的首字母小写
 			result += strings.ToLower(word)
 		} else {
-			// 其他情况首字母大写
 			if len(word) > 0 {
 				result += strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
 			}
@@ -65,12 +60,10 @@ func IsValidProjectName(name string) bool {
 		return false
 	}
 
-	// 检查首字符是否为字母
 	if !unicode.IsLetter(rune(name[0])) {
 		return false
 	}
 
-	// 检查其余字符是否为字母、数字或下划线
 	for _, r := range name {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
 			return false
@@ -85,12 +78,9 @@ func IsValidComponentName(name string) bool {
 }
 
 func IsProjectRoot() bool {
-	// 检查 go.mod 文件
 	if _, err := os.Stat("go.mod"); err != nil {
 		return false
 	}
-
-	// 检查 internal 目录
 	if _, err := os.Stat("internal"); err != nil {
 		return false
 	}
@@ -98,7 +88,6 @@ func IsProjectRoot() bool {
 	return true
 }
 
-// CreateDirectoryStructure 创建目录结构
 func CreateDirectoryStructure(basePath string, dirs []string) error {
 	for _, dir := range dirs {
 		dirPath := filepath.Join(basePath, dir)
@@ -109,13 +98,11 @@ func CreateDirectoryStructure(basePath string, dirs []string) error {
 	return nil
 }
 
-// FileExists 检查文件是否存在
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// DirectoryExists 检查目录是否存在
 func DirectoryExists(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -137,7 +124,6 @@ func GetProjectRoot() (string, error) {
 
 		parent := filepath.Dir(cwd)
 		if parent == cwd {
-			// 已经到达根目录
 			break
 		}
 		cwd = parent
@@ -146,7 +132,6 @@ func GetProjectRoot() (string, error) {
 	return "", os.ErrNotExist
 }
 
-// ReadFile 读取文件内容
 func ReadFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -155,12 +140,10 @@ func ReadFile(path string) (string, error) {
 	return string(data), nil
 }
 
-// WriteFile 写入文件
 func WriteFile(path string, content string) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-// AppendFile 追加文件内容
 func AppendFile(path string, content string) error {
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {

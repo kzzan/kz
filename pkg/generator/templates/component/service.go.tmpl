@@ -1,0 +1,90 @@
+package service
+
+import (
+	"context"
+	"fmt"
+
+	"{{.Module}}/internal/models"
+	"{{.Module}}/internal/repository"
+	"{{.Module}}/pkg/pagination"
+	"{{.Module}}/pkg/queue"
+
+	"github.com/rs/zerolog"
+	"github.com/samber/do/v2"
+)
+
+type {{.Pascal}}Service interface {
+	List(ctx context.Context, q pagination.Query) (pagination.Result[models.{{.Pascal}}], error)
+	GetByID(ctx context.Context, id string) (*models.{{.Pascal}}, error)
+	Create(ctx context.Context, m *models.{{.Pascal}}) (*models.{{.Pascal}}, error)
+	Update(ctx context.Context, id string, m *models.{{.Pascal}}) (*models.{{.Pascal}}, error)
+	Delete(ctx context.Context, id string) error
+	Count(ctx context.Context) (int64, error)
+}
+
+type {{.Snake}}Service struct {
+	logger *zerolog.Logger
+	repo   repository.{{.Pascal}}Repository
+	queue  queue.Queue
+}
+
+func New{{.Pascal}}Service(i do.Injector) ({{.Pascal}}Service, error) {
+	return &{{.Snake}}Service{
+		logger: do.MustInvoke[*zerolog.Logger](i),
+		repo:   do.MustInvoke[repository.{{.Pascal}}Repository](i),
+		queue:  do.MustInvoke[queue.Queue](i),
+	}, nil
+}
+
+func (s *{{.Snake}}Service) List(ctx context.Context, q pagination.Query) (pagination.Result[models.{{.Pascal}}], error) {
+	return s.repo.List(ctx, q)
+}
+
+func (s *{{.Snake}}Service) GetByID(ctx context.Context, id string) (*models.{{.Pascal}}, error) {
+	if id == "" {
+		return nil, fmt.Errorf("ID 不能为空")
+	}
+	return s.repo.FindByID(ctx, id)
+}
+
+func (s *{{.Snake}}Service) Create(ctx context.Context, m *models.{{.Pascal}}) (*models.{{.Pascal}}, error) {
+	if m == nil {
+		return nil, fmt.Errorf("创建数据不能为空")
+	}
+	result, err := s.repo.Create(ctx, m)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.queue.Publish(ctx, "{{.Snake}}.created", result)
+	return result, nil
+}
+
+func (s *{{.Snake}}Service) Update(ctx context.Context, id string, m *models.{{.Pascal}}) (*models.{{.Pascal}}, error) {
+	if id == "" {
+		return nil, fmt.Errorf("ID 不能为空")
+	}
+	if m == nil {
+		return nil, fmt.Errorf("更新数据不能为空")
+	}
+	result, err := s.repo.Update(ctx, id, m)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.queue.Publish(ctx, "{{.Snake}}.updated", result)
+	return result, nil
+}
+
+func (s *{{.Snake}}Service) Delete(ctx context.Context, id string) error {
+	if id == "" {
+		return fmt.Errorf("ID 不能为空")
+	}
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	_ = s.queue.Publish(ctx, "{{.Snake}}.deleted", map[string]string{"id": id})
+	return nil
+}
+
+func (s *{{.Snake}}Service) Count(ctx context.Context) (int64, error) {
+	return s.repo.Count(ctx)
+}

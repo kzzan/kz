@@ -1,0 +1,70 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"{{.ProjectName}}/internal/handler"
+	"{{.ProjectName}}/internal/middleware"
+	"{{.ProjectName}}/pkg/cache"
+	"{{.ProjectName}}/pkg/config"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
+	"github.com/samber/do/v2"
+)
+
+type Server struct {
+	config      *config.Config
+	logger      *zerolog.Logger
+	engine      *gin.Engine
+	server      *http.Server
+	userHandler handler.UserHandler
+}
+
+func NewServer(i do.Injector) (*Server, error) {
+	cfg    := do.MustInvoke[*config.Config](i)
+	logger := do.MustInvoke[*zerolog.Logger](i)
+	c      := do.MustInvoke[cache.Cache](i)
+
+	s := &Server{
+		config:      cfg,
+		logger:      logger,
+		userHandler: do.MustInvoke[handler.UserHandler](i),
+	}
+
+	s.engine = gin.New()
+	s.engine.Use(
+		middleware.Logger(logger),
+		middleware.Recovery(logger),
+		middleware.RateLimit(c, logger, 100),
+	)
+	s.setupRoutes(logger)
+
+	s.server = &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+		Handler:      s.engine,
+		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	logger.Info().
+		Str("host", cfg.Server.Host).
+		Int("port", cfg.Server.Port).
+		Msg("Server initialized")
+
+	return s, nil
+}
+
+func (s *Server) Start() error {
+	s.logger.Info().Msg("HTTP server starting")
+	return s.server.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Info().Msg("Shutting down HTTP server")
+	return s.server.Shutdown(ctx)
+}

@@ -1,0 +1,172 @@
+package handler
+
+import (
+	"net/http"
+
+	"{{.Module}}/internal/models"
+	"{{.Module}}/internal/service"
+	"{{.Module}}/pkg/pagination"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
+	"github.com/samber/do/v2"
+)
+
+type List{{.Pascal}}Request struct {
+	Page    int    `form:"page"    binding:"min=1"`
+	Size    int    `form:"size"    binding:"min=1,max=100"`
+	Keyword string `form:"keyword"`
+	Sort    string `form:"sort"`
+}
+
+type Get{{.Pascal}}Request struct {
+	ID string `uri:"id" binding:"required"`
+}
+
+type Create{{.Pascal}}Request struct {
+	// TODO: 填写创建字段
+	// Name string `json:"name" binding:"required"`
+}
+
+type Update{{.Pascal}}Request struct {
+	// TODO: 填写更新字段
+	// Name string `json:"name"`
+}
+
+type {{.Pascal}}Response struct {
+	// TODO: 填写响应字段
+	// ID        uint      `json:"id"`
+	// CreatedAt time.Time `json:"created_at"`
+}
+
+type List{{.Pascal}}Response struct {
+	Total int64              `json:"total"`
+	List  []{{.Pascal}}Response `json:"list"`
+}
+
+func to{{.Pascal}}Response(m *models.{{.Pascal}}) {{.Pascal}}Response {
+	return {{.Pascal}}Response{
+		// TODO: 填写字段映射
+		// ID:        m.ID,
+		// CreatedAt: m.CreatedAt,
+	}
+}
+
+type {{.Pascal}}Handler interface {
+	List(c *gin.Context)
+	Get(c *gin.Context)
+	Create(c *gin.Context)
+	Update(c *gin.Context)
+	Delete(c *gin.Context)
+}
+
+type {{.Snake}}Handler struct {
+	logger  *zerolog.Logger
+	service service.{{.Pascal}}Service
+}
+
+func New{{.Pascal}}Handler(i do.Injector) ({{.Pascal}}Handler, error) {
+	return &{{.Snake}}Handler{
+		logger:  do.MustInvoke[*zerolog.Logger](i),
+		service: do.MustInvoke[service.{{.Pascal}}Service](i),
+	}, nil
+}
+
+func (h *{{.Snake}}Handler) List(c *gin.Context) {
+	var req List{{.Pascal}}Request
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	result, err := h.service.List(c.Request.Context(), pagination.Query{
+		Page:    req.Page,
+		Size:    req.Size,
+		Keyword: req.Keyword,
+		Sort:    req.Sort,
+	})
+	if err != nil {
+		h.logger.Error().Err(err).Msg("List {{.Component}} failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	list := make([]{{.Pascal}}Response, len(result.List))
+	for i, m := range result.List {
+		list[i] = to{{.Pascal}}Response(&m)
+	}
+	c.JSON(http.StatusOK, List{{.Pascal}}Response{
+		Total: result.Total,
+		List:  list,
+	})
+}
+
+func (h *{{.Snake}}Handler) Get(c *gin.Context) {
+	var req Get{{.Pascal}}Request
+	if err := c.ShouldBindUri(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	result, err := h.service.GetByID(c.Request.Context(), req.ID)
+	if err != nil {
+		h.logger.Error().Err(err).Str("id", req.ID).Msg("Get {{.Component}} failed")
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": to{{.Pascal}}Response(result)})
+}
+
+func (h *{{.Snake}}Handler) Create(c *gin.Context) {
+	var req Create{{.Pascal}}Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	m := &models.{{.Pascal}}{
+		// TODO: 填写字段映射
+		// Name: req.Name,
+	}
+	result, err := h.service.Create(c.Request.Context(), m)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Create {{.Component}} failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": to{{.Pascal}}Response(result)})
+}
+
+func (h *{{.Snake}}Handler) Update(c *gin.Context) {
+	var req Update{{.Pascal}}Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var uriReq Get{{.Pascal}}Request
+	if err := c.ShouldBindUri(&uriReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	m := &models.{{.Pascal}}{
+		// TODO: 填写字段映射
+		// Name: req.Name,
+	}
+	result, err := h.service.Update(c.Request.Context(), uriReq.ID, m)
+	if err != nil {
+		h.logger.Error().Err(err).Str("id", uriReq.ID).Msg("Update {{.Component}} failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": to{{.Pascal}}Response(result)})
+}
+
+func (h *{{.Snake}}Handler) Delete(c *gin.Context) {
+	var req Get{{.Pascal}}Request
+	if err := c.ShouldBindUri(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.service.Delete(c.Request.Context(), req.ID); err != nil {
+		h.logger.Error().Err(err).Str("id", req.ID).Msg("Delete {{.Component}} failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}

@@ -1,0 +1,23 @@
+package cron
+
+import (
+	"github.com/robfig/cron/v3"
+	"github.com/rs/zerolog"
+)
+
+type {{.Pascal}}Job struct {
+	logger *zerolog.Logger
+	//service service.XXXService //填入
+}
+
+func new{{.Pascal}}Job(logger *zerolog.Logger) *{{.Pascal}}Job {
+	return &{{.Pascal}}Job{logger: logger}
+}
+
+func (j *{{.Pascal}}Job) Register(c *cron.Cron) {
+	c.AddFunc("0 * * * * *", j.run)
+}
+
+func (j *{{.Pascal}}Job) run() {
+	j.logger.Info().Msg("{{.Pascal}}Job running")
+}

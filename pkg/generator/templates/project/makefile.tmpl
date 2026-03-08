@@ -1,0 +1,35 @@
+.PHONY: help deps build run test clean watch-run
+
+help:
+	@echo "可用命令:"
+	@echo "  make deps       安装依赖"
+	@echo "  make build      编译项目"
+	@echo "  make run        运行项目"
+	@echo "  make test       运行测试"
+	@echo "  make clean      清理输出"
+	@echo "  make watch-run  热重载运行（需要 air）"
+
+deps:
+	go mod download
+	go mod tidy
+
+deps-tools:
+	go install github.com/air-verse/air@latest
+
+build:
+	mkdir -p bin
+	go build -o bin/{{.ProjectName}} ./cmd
+
+run:
+	go run ./cmd/main.go
+
+watch-run:
+	air
+
+test:
+	go test -v -cover ./...
+
+clean:
+	rm -rf bin/
+	go clean
+

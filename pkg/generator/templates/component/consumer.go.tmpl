@@ -1,0 +1,40 @@
+package consumer
+
+import (
+	"context"
+
+	"{{.Module}}/pkg/queue"
+
+	"github.com/rs/zerolog"
+)
+
+type {{.Pascal}}Consumer struct {
+	logger *zerolog.Logger
+	queue  queue.Queue
+	//service service.XXXService //填入
+}
+
+func new{{.Pascal}}Consumer(logger *zerolog.Logger, q queue.Queue) *{{.Pascal}}Consumer {
+	return &{{.Pascal}}Consumer{
+		logger: logger,
+		queue:  q,
+	}
+}
+
+func (c *{{.Pascal}}Consumer) Topic() string {
+	return "{{.Snake}}"
+}
+
+func (c *{{.Pascal}}Consumer) Start(ctx context.Context) error {
+	c.logger.Info().Str("topic", c.Topic()).Msg("consumer started")
+	return c.queue.Subscribe(ctx, c.Topic(), c.handle)
+}
+
+func (c *{{.Pascal}}Consumer) handle(ctx context.Context, msg *queue.Message) error {
+	c.logger.Info().
+		Str("topic", msg.Topic).
+		Str("id", msg.ID).
+		Msg("{{.Pascal}}Consumer received message")
+	// TODO: 处理消息
+	return nil
+}

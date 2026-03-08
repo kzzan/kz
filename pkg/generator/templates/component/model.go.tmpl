@@ -1,0 +1,31 @@
+package models
+
+import "time"
+
+type {{.Pascal}} struct {
+	ID        string     `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	CreatedAt time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	DeletedAt *time.Time `gorm:"column:deleted_at;index" json:"deleted_at,omitempty"`
+}
+
+func (m *{{.Pascal}}) TableName() string {
+	return "{{.Snake}}s"
+}
+
+type {{.Pascal}}Create struct{}
+type {{.Pascal}}Update struct{}
+
+type {{.Pascal}}Response struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (m *{{.Pascal}}) ToResponse() *{{.Pascal}}Response {
+	return &{{.Pascal}}Response{
+		ID:        m.ID,
+		CreatedAt: m.CreatedAt,
+		UpdatedAt: m.UpdatedAt,
+	}
+}

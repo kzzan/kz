@@ -1,0 +1,16 @@
+package server
+
+import (
+	"{{.ProjectName}}/internal/handler"
+	"{{.ProjectName}}/internal/repository"
+	"{{.ProjectName}}/internal/service"
+
+	"github.com/samber/do/v2"
+)
+
+var Package = do.Package(
+	repository.Package,
+	service.Package,
+	handler.Package,
+	do.Lazy(NewServer),
+)
