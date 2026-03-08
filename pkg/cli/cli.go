@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-    "github.com/kzzan/kz/pkg/generator"
+	"github.com/kzzan/kz/pkg/generator"
 	"github.com/kzzan/kz/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -39,7 +39,7 @@ var rootCmd = &cobra.Command{
   kz new middleware [name]       生成空中间件
   kz version                     显示版本信息`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 

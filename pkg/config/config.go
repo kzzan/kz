@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -15,10 +16,10 @@ type Config struct {
 
 func (c *Config) Validate() error {
 	if c.ProjectName == "" {
-		return fmt.Errorf("项目名称不能为空")
+		return errors.New("项目名称不能为空")
 	}
 	if c.Database == "" || (c.Database != "postgresql" && c.Database != "mysql") {
-		return fmt.Errorf("无效的数据库类型")
+		return errors.New("无效的数据库类型")
 	}
 	return nil
 }
@@ -44,7 +45,7 @@ func LoadConfig() (*Config, error) {
 	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("无法读取配置文件: %v", err)
+		return nil, fmt.Errorf("无法读取配置文件: %w", err)
 	}
 
 	return &Config{

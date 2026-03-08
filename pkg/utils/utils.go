@@ -13,14 +13,14 @@ func ToPascalCase(input string) string {
 }
 
 func ToSnakeCase(input string) string {
-	result := ""
+	var sb strings.Builder
 	for i, r := range input {
 		if i > 0 && unicode.IsUpper(r) {
-			result += "_"
+			sb.WriteByte('_')
 		}
-		result += strings.ToLower(string(r))
+		sb.WriteString(strings.ToLower(string(r)))
 	}
-	return result
+	return sb.String()
 }
 
 func ToCamelCase(input string) string {
@@ -36,40 +36,34 @@ func toCamelCase(input string, isPascal bool) string {
 	).Replace(input)
 
 	words := strings.Fields(normalized)
-
 	if len(words) == 0 {
 		return ""
 	}
 
-	result := ""
+	var sb strings.Builder
 	for i, word := range words {
 		if i == 0 && !isPascal {
-			result += strings.ToLower(word)
-		} else {
-			if len(word) > 0 {
-				result += strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
-			}
+			sb.WriteString(strings.ToLower(word))
+		} else if len(word) > 0 {
+			sb.WriteString(strings.ToUpper(string(word[0])))
+			sb.WriteString(strings.ToLower(word[1:]))
 		}
 	}
-
-	return result
+	return sb.String()
 }
 
 func IsValidProjectName(name string) bool {
 	if name == "" {
 		return false
 	}
-
 	if !unicode.IsLetter(rune(name[0])) {
 		return false
 	}
-
 	for _, r := range name {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -84,7 +78,6 @@ func IsProjectRoot() bool {
 	if _, err := os.Stat("internal"); err != nil {
 		return false
 	}
-
 	return true
 }
 
@@ -116,19 +109,16 @@ func GetProjectRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	for {
 		if FileExists(filepath.Join(cwd, "go.mod")) {
 			return cwd, nil
 		}
-
 		parent := filepath.Dir(cwd)
 		if parent == cwd {
 			break
 		}
 		cwd = parent
 	}
-
 	return "", os.ErrNotExist
 }
 
@@ -154,7 +144,6 @@ func AppendFile(path string, content string) error {
 			panic(err)
 		}
 	}()
-
 	_, err = f.WriteString(content)
 	return err
 }
@@ -182,17 +171,14 @@ func ValidateGoPackageName(name string) bool {
 	if name == "" {
 		return false
 	}
-
 	if !unicode.IsLetter(rune(name[0])) && name[0] != '_' {
 		return false
 	}
-
 	for _, r := range name {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -211,7 +197,6 @@ func GetRelativePath(basePath string, targetPath string) (string, error) {
 
 func ExtractComponentName(filename string) string {
 	name := strings.TrimSuffix(filename, filepath.Ext(filename))
-
 	for _, suffix := range []string{"_handler", "_service", "_repository", "_model"} {
 		if strings.HasSuffix(name, suffix) {
 			return strings.TrimSuffix(name, suffix)
@@ -222,11 +207,9 @@ func ExtractComponentName(filename string) string {
 
 func NormalizeComponentName(name string) string {
 	snakeCase := ToSnakeCase(name)
-
 	for _, suffix := range []string{"_handler", "_service", "_repository", "_model"} {
 		snakeCase = strings.TrimSuffix(snakeCase, suffix)
 	}
-
 	return snakeCase
 }
 
@@ -237,7 +220,6 @@ func IsReservedKeyword(name string) bool {
 		"map", "package", "range", "return", "select", "struct", "switch", "type",
 		"var",
 	}
-
 	for _, kw := range keywords {
 		if name == kw {
 			return true
@@ -260,13 +242,11 @@ func ListFiles(dirPath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			files = append(files, entry.Name())
 		}
 	}
-
 	return files, nil
 }
 
@@ -276,34 +256,28 @@ func ListDirectories(dirPath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for _, entry := range entries {
 		if entry.IsDir() {
 			dirs = append(dirs, entry.Name())
 		}
 	}
-
 	return dirs, nil
 }
 
 func ReadModuleName(dir string) string {
 	gomodPath := filepath.Join(dir, "go.mod")
-
 	data, err := os.ReadFile(gomodPath)
 	if err != nil {
 		return filepath.Base(dir)
 	}
-
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "module ") {
-			moduleName := strings.TrimPrefix(line, "module ")
-			moduleName = strings.TrimSpace(moduleName)
+			moduleName := strings.TrimSpace(strings.TrimPrefix(line, "module "))
 			if moduleName != "" {
 				return moduleName
 			}
 		}
 	}
-
 	return filepath.Base(dir)
 }

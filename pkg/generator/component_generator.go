@@ -2,6 +2,7 @@ package generator
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -144,12 +145,12 @@ func (cg *ComponentGenerator) AppendConsumerToManager() error {
 	}
 	content := string(data)
 
-	consumerLine := fmt.Sprintf("new%sConsumer(logger, q)", cg.PascalName)
+	consumerLine := "new" + cg.PascalName + "Consumer(logger, q)"
 	if strings.Contains(content, consumerLine) {
 		return nil
 	}
 
-	appendStmt := fmt.Sprintf("\tm.consumers = append(m.consumers, new%sConsumer(logger, q))", cg.PascalName)
+	appendStmt := "\tm.consumers = append(m.consumers, new" + cg.PascalName + "Consumer(logger, q))"
 
 	placeholder := "// CONSUMERS_PLACEHOLDER"
 	if strings.Contains(content, placeholder) {
@@ -181,12 +182,12 @@ func (cg *ComponentGenerator) AppendCronToScheduler() error {
 		return fmt.Errorf("读取 cron/package.go 失败: %w", err)
 	}
 	content := string(data)
-	jobLine := fmt.Sprintf("new%sJob(s.logger).Register(s.c)", cg.PascalName)
+	jobLine := "new" + cg.PascalName + "Job(s.logger).Register(s.c)"
 	if strings.Contains(content, jobLine) {
 		return nil
 	}
 
-	registerStmt := fmt.Sprintf("\tnew%sJob(s.logger).Register(s.c)", cg.PascalName)
+	registerStmt := "\tnew" + cg.PascalName + "Job(s.logger).Register(s.c)"
 	placeholder := "// JOBS_PLACEHOLDER"
 	if strings.Contains(content, placeholder) {
 		content = strings.Replace(content,
@@ -203,17 +204,17 @@ func (cg *ComponentGenerator) AppendCronToScheduler() error {
 
 func (cg *ComponentGenerator) AppendHandlerToPackage() error {
 	return cg.appendToPackage("internal/handler/package.go",
-		fmt.Sprintf("do.Lazy(New%sHandler)", cg.PascalName))
+		"do.Lazy(New"+cg.PascalName+"Handler)")
 }
 
 func (cg *ComponentGenerator) AppendServiceToPackage() error {
 	return cg.appendToPackage("internal/service/package.go",
-		fmt.Sprintf("do.Lazy(New%sService)", cg.PascalName))
+		"do.Lazy(New"+cg.PascalName+"Service)")
 }
 
 func (cg *ComponentGenerator) AppendRepositoryToPackage() error {
 	return cg.appendToPackage("internal/repository/package.go",
-		fmt.Sprintf("do.Lazy(New%sRepository)", cg.PascalName))
+		"do.Lazy(New"+cg.PascalName+"Repository)")
 }
 
 func (cg *ComponentGenerator) AppendCronPackageToServer() error {
@@ -287,7 +288,7 @@ func (cg *ComponentGenerator) appendToPackage(relPath, newLine string) error {
 	}
 	lastParen := strings.LastIndex(content, ")")
 	if lastParen == -1 {
-		return fmt.Errorf("%s 格式异常：未找到结束括号", relPath)
+		return errors.New(relPath + " 格式异常：未找到结束括号")
 	}
 	before := strings.TrimRight(content[:lastParen], " \t\n")
 	return os.WriteFile(fullPath, []byte(before+"\n\t"+newLine+",\n"+content[lastParen:]), 0o644)
@@ -300,11 +301,11 @@ func (cg *ComponentGenerator) appendPackageToServerDI(pkg string) error {
 		return fmt.Errorf("读取 server/package.go 失败: %w", err)
 	}
 	content := string(data)
-	diLine := fmt.Sprintf("%s.Package,", pkg)
+	diLine := pkg + ".Package,"
 	if strings.Contains(content, diLine) {
 		return nil
 	}
-	content = ensureImport(content, fmt.Sprintf(`"%s/internal/%s"`, cg.ModuleName, pkg))
+	content = ensureImport(content, `"`+cg.ModuleName+`/internal/`+pkg+`"`)
 	content = appendAfterLastMatch(content, "do.Package(", "\t"+diLine)
 	return os.WriteFile(serverPkgPath, []byte(content), 0o644)
 }
@@ -317,7 +318,7 @@ func (cg *ComponentGenerator) appendHandlerFieldToServer() error {
 	}
 	content := string(data)
 
-	fieldName := fmt.Sprintf("%sHandler", cg.SnakeName)
+	fieldName := cg.SnakeName + "Handler"
 	if strings.Contains(content, fieldName) {
 		return nil
 	}
@@ -325,13 +326,13 @@ func (cg *ComponentGenerator) appendHandlerFieldToServer() error {
 	content = appendAfterLastMatch(
 		content,
 		"Handler handler.",
-		fmt.Sprintf("\t%sHandler handler.%sHandler", cg.SnakeName, cg.PascalName),
+		"\t"+cg.SnakeName+"Handler handler."+cg.PascalName+"Handler",
 	)
 
 	content = appendAfterLastMatch(
 		content,
 		"do.MustInvoke[handler.",
-		fmt.Sprintf("\t\t%sHandler: do.MustInvoke[handler.%sHandler](i),", cg.SnakeName, cg.PascalName),
+		"\t\t"+cg.SnakeName+"Handler: do.MustInvoke[handler."+cg.PascalName+"Handler](i),",
 	)
 
 	return os.WriteFile(fullPath, []byte(content), 0o644)
@@ -345,7 +346,7 @@ func (cg *ComponentGenerator) appendRouteGroupToRoutes() error {
 	}
 	content := string(data)
 
-	if strings.Contains(content, fmt.Sprintf("/%ss\"", cg.SnakeName)) {
+	if strings.Contains(content, "/"+cg.SnakeName+"s\"") {
 		return nil
 	}
 
@@ -371,7 +372,7 @@ func (cg *ComponentGenerator) appendRouteGroupToRoutes() error {
 		}
 	}
 	if insertIdx == -1 {
-		return fmt.Errorf("routes.go 格式异常：未找到插入位置")
+		return errors.New("routes.go 格式异常：未找到插入位置")
 	}
 
 	result := make([]string, 0, len(lines)+15)

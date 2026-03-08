@@ -1,0 +1,14 @@
+package middleware
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
+)
+
+func {{.Pascal}}(logger *zerolog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// TODO: 请求处理前逻辑
+		c.Next()
+		// TODO: 请求处理后逻辑（可选）
+	}
+}
