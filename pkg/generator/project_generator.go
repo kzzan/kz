@@ -40,7 +40,6 @@ func (pg *ProjectGenerator) data() ProjectTemplateData {
 	}
 }
 
-// render 从 embed.FS 渲染 project 模板
 func (pg *ProjectGenerator) render(tmplPath string) (string, error) {
 	tmpl, err := template.New(filepath.Base(tmplPath)).
 		ParseFS(templateFS, tmplPath)
