@@ -62,7 +62,7 @@ func (pg *ProjectGenerator) writeFile(relPath, tmplPath string) error {
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}
-	return os.WriteFile(fullPath, []byte(content), 0o644)
+	return os.WriteFile(fullPath, []byte(content), 0o600)
 }
 
 func (pg *ProjectGenerator) GenerateProject() error {

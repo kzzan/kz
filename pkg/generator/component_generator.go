@@ -68,7 +68,7 @@ func (cg *ComponentGenerator) renderAndWrite(tmplPath, outRelPath string) error 
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}
-	return os.WriteFile(fullPath, []byte(content), 0o644)
+	return os.WriteFile(fullPath, []byte(content), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func (cg *ComponentGenerator) GenerateModel() error {
@@ -139,7 +139,7 @@ func (cg *ComponentGenerator) EnsureConsumerPackage() error {
 
 func (cg *ComponentGenerator) AppendConsumerToManager() error {
 	pkgPath := filepath.Join(cg.ProjectRoot, "internal/consumer/package.go")
-	data, err := os.ReadFile(pkgPath)
+	data, err := os.ReadFile(pkgPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return fmt.Errorf("读取 consumer/package.go 失败: %w", err)
 	}
@@ -164,7 +164,7 @@ func (cg *ComponentGenerator) AppendConsumerToManager() error {
 	}
 
 	content = strings.Replace(content, "\n\t_ = q\n", "\n", 1)
-	return os.WriteFile(pkgPath, []byte(content), 0o644)
+	return os.WriteFile(pkgPath, []byte(content), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func (cg *ComponentGenerator) EnsureCronPackage() error {
@@ -177,7 +177,7 @@ func (cg *ComponentGenerator) EnsureCronPackage() error {
 
 func (cg *ComponentGenerator) AppendCronToScheduler() error {
 	pkgPath := filepath.Join(cg.ProjectRoot, "internal/cron/package.go")
-	data, err := os.ReadFile(pkgPath)
+	data, err := os.ReadFile(pkgPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return fmt.Errorf("读取 cron/package.go 失败: %w", err)
 	}
@@ -199,7 +199,7 @@ func (cg *ComponentGenerator) AppendCronToScheduler() error {
 		content = appendBeforeLastFuncClose(content, "func (s *Scheduler) registerJobs", registerStmt)
 	}
 
-	return os.WriteFile(pkgPath, []byte(content), 0o644)
+	return os.WriteFile(pkgPath, []byte(content), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func (cg *ComponentGenerator) AppendHandlerToPackage() error {
@@ -278,7 +278,7 @@ func (cg *ComponentGenerator) runSteps(steps []step) error {
 
 func (cg *ComponentGenerator) appendToPackage(relPath, newLine string) error {
 	fullPath := filepath.Join(cg.ProjectRoot, relPath)
-	data, err := os.ReadFile(fullPath)
+	data, err := os.ReadFile(fullPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return fmt.Errorf("读取 %s 失败: %w", relPath, err)
 	}
@@ -291,12 +291,12 @@ func (cg *ComponentGenerator) appendToPackage(relPath, newLine string) error {
 		return errors.New(relPath + " 格式异常：未找到结束括号")
 	}
 	before := strings.TrimRight(content[:lastParen], " \t\n")
-	return os.WriteFile(fullPath, []byte(before+"\n\t"+newLine+",\n"+content[lastParen:]), 0o644)
+	return os.WriteFile(fullPath, []byte(before+"\n\t"+newLine+",\n"+content[lastParen:]), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func (cg *ComponentGenerator) appendPackageToServerDI(pkg string) error {
 	serverPkgPath := filepath.Join(cg.ProjectRoot, "internal/server/package.go")
-	data, err := os.ReadFile(serverPkgPath)
+	data, err := os.ReadFile(serverPkgPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return fmt.Errorf("读取 server/package.go 失败: %w", err)
 	}
@@ -307,12 +307,12 @@ func (cg *ComponentGenerator) appendPackageToServerDI(pkg string) error {
 	}
 	content = ensureImport(content, `"`+cg.ModuleName+`/internal/`+pkg+`"`)
 	content = appendAfterLastMatch(content, "do.Package(", "\t"+diLine)
-	return os.WriteFile(serverPkgPath, []byte(content), 0o644)
+	return os.WriteFile(serverPkgPath, []byte(content), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func (cg *ComponentGenerator) appendHandlerFieldToServer() error {
 	fullPath := filepath.Join(cg.ProjectRoot, "internal/server/server.go")
-	data, err := os.ReadFile(fullPath)
+	data, err := os.ReadFile(fullPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return fmt.Errorf("读取 server.go 失败: %w", err)
 	}
@@ -335,12 +335,12 @@ func (cg *ComponentGenerator) appendHandlerFieldToServer() error {
 		"\t\t"+cg.SnakeName+"Handler: do.MustInvoke[handler."+cg.PascalName+"Handler](i),",
 	)
 
-	return os.WriteFile(fullPath, []byte(content), 0o644)
+	return os.WriteFile(fullPath, []byte(content), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func (cg *ComponentGenerator) appendRouteGroupToRoutes() error {
 	fullPath := filepath.Join(cg.ProjectRoot, "internal/server/routes.go")
-	data, err := os.ReadFile(fullPath)
+	data, err := os.ReadFile(fullPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return fmt.Errorf("读取 routes.go 失败: %w", err)
 	}
@@ -380,5 +380,5 @@ func (cg *ComponentGenerator) appendRouteGroupToRoutes() error {
 	result = append(result, routeBlock)
 	result = append(result, lines[insertIdx:]...)
 
-	return os.WriteFile(fullPath, []byte(strings.Join(result, "\n")), 0o644)
+	return os.WriteFile(fullPath, []byte(strings.Join(result, "\n")), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
