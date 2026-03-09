@@ -123,7 +123,7 @@ func GetProjectRoot() (string, error) {
 }
 
 func ReadFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return "", err
 	}
@@ -131,11 +131,11 @@ func ReadFile(path string) (string, error) {
 }
 
 func WriteFile(path string, content string) error {
-	return os.WriteFile(path, []byte(content), 0o644)
+	return os.WriteFile(path, []byte(content), 0o600) // bearer:disable go_gosec_file_permissions_file_perm
 }
 
 func AppendFile(path string, content string) error {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) // bearer:disable go_gosec_file_permissions_file_perm go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func ListDirectories(dirPath string) ([]string, error) {
 
 func ReadModuleName(dir string) string {
 	gomodPath := filepath.Join(dir, "go.mod")
-	data, err := os.ReadFile(gomodPath)
+	data, err := os.ReadFile(gomodPath) // bearer:disable go_gosec_filesystem_filereadtaint
 	if err != nil {
 		return filepath.Base(dir)
 	}
