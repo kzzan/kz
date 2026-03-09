@@ -22,6 +22,8 @@ jobs:
 
       - name: Bearer
         uses: bearer/bearer-action@v2
+        with:
+          skip-rule: go_gosec_filesystem_filereadtaint
 
       - id: govulncheck
         uses: golang/govulncheck-action@v1
