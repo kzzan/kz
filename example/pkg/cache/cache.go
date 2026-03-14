@@ -1,0 +1,112 @@
+package cache
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"example/pkg/config"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
+	"github.com/samber/do/v2"
+)
+
+type Cache interface {
+	Get(ctx context.Context, key string) (string, error)
+	GetJSON(ctx context.Context, key string, v interface{}) error
+	Set(ctx context.Context, key string, value string, expiration time.Duration) error
+	SetJSON(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	Delete(ctx context.Context, key string) error
+	Exists(ctx context.Context, key string) (bool, error)
+	TTL(ctx context.Context, key string) (time.Duration, error)
+}
+
+type redisCache struct {
+	client *redis.Client
+	logger *zerolog.Logger
+}
+
+func NewCache(i do.Injector) (Cache, error) {
+	cfg    := do.MustInvoke[*config.Config](i)
+	logger := do.MustInvoke[*zerolog.Logger](i)
+
+	client := redis.NewClient(&redis.Options{
+		Addr:         fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port),
+		Password:     cfg.Redis.Password,
+		DB:           cfg.Redis.DB,
+		PoolSize:     cfg.Redis.PoolSize,
+		MinIdleConns: cfg.Redis.MinIdleConns,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("连接 Redis 失败: %w", err)
+	}
+
+	logger.Info().
+		Str("host", cfg.Redis.Host).
+		Int("port", cfg.Redis.Port).
+		Msg("Redis cache connected")
+
+	return &redisCache{client: client, logger: logger}, nil
+}
+
+func (c *redisCache) Get(ctx context.Context, key string) (string, error) {
+	val, err := c.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	if err != nil {
+		c.logger.Error().Err(err).Str("key", key).Msg("cache get failed")
+		return "", err
+	}
+	return val, nil
+}
+
+func (c *redisCache) GetJSON(ctx context.Context, key string, v interface{}) error {
+	val, err := c.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	if val == "" {
+		return redis.Nil
+	}
+	return json.Unmarshal([]byte(val), v)
+}
+
+func (c *redisCache) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
+	if err := c.client.Set(ctx, key, value, expiration).Err(); err != nil {
+		c.logger.Error().Err(err).Str("key", key).Msg("cache set failed")
+		return err
+	}
+	return nil
+}
+
+func (c *redisCache) SetJSON(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return c.Set(ctx, key, string(data), expiration)
+}
+
+func (c *redisCache) Delete(ctx context.Context, key string) error {
+	return c.client.Del(ctx, key).Err()
+}
+
+func (c *redisCache) Exists(ctx context.Context, key string) (bool, error) {
+	n, err := c.client.Exists(ctx, key).Result()
+	return n > 0, err
+}
+
+func (c *redisCache) TTL(ctx context.Context, key string) (time.Duration, error) {
+	return c.client.TTL(ctx, key).Result()
+}
+
+func (c *redisCache) Shutdown() error {
+	return c.client.Close()
+}

@@ -1,0 +1,15 @@
+module example
+
+go 1.25
+
+require (
+	github.com/gin-gonic/gin v1.9.1
+	github.com/google/uuid v1.6.0
+	github.com/redis/go-redis/v9 v9.5.1
+	github.com/robfig/cron/v3 v3.0.1
+	github.com/rs/zerolog v1.33.0
+	github.com/samber/do/v2 v2.0.0
+	github.com/spf13/viper v1.18.0
+	gorm.io/driver/postgres v1.5.9
+	gorm.io/gorm v1.25.10
+)

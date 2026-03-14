@@ -1,0 +1,52 @@
+package database
+
+import (
+	"fmt"
+	"time"
+
+	"example/pkg/config"
+
+	"github.com/rs/zerolog"
+	"github.com/samber/do/v2"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
+)
+
+func NewDatabase(i do.Injector) (*gorm.DB, error) {
+	cfg    := do.MustInvoke[*config.Config](i)
+	logger := do.MustInvoke[*zerolog.Logger](i)
+
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Database,
+		cfg.Database.SSLMode,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("连接数据库失败: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("获取 sql.DB 失败: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.Database.ConnMaxLifetime) * time.Second)
+
+	logger.Info().
+		Str("host", cfg.Database.Host).
+		Int("port", cfg.Database.Port).
+		Str("database", cfg.Database.Database).
+		Msg("Database connected")
+
+	return db, nil
+}

@@ -1,0 +1,50 @@
+package consumer
+
+import (
+	"context"
+
+	"example/pkg/queue"
+
+	"github.com/rs/zerolog"
+	"github.com/samber/do/v2"
+)
+
+type Manager struct {
+	consumers []starter
+	logger    *zerolog.Logger
+}
+
+type starter interface {
+	Topic() string
+	Start(ctx context.Context) error
+}
+
+func NewManager(i do.Injector) (*Manager, error) {
+	logger := do.MustInvoke[*zerolog.Logger](i)
+	q      := do.MustInvoke[queue.Queue](i)
+	m := &Manager{logger: logger}
+	// CONSUMERS_PLACEHOLDER
+	_ = q
+	return m, nil
+}
+
+func (m *Manager) Start(ctx context.Context) {
+	for _, c := range m.consumers {
+		go func(cs starter) {
+			m.logger.Info().Str("topic", cs.Topic()).Msg("starting consumer")
+			if err := cs.Start(ctx); err != nil {
+				m.logger.Error().Err(err).Str("topic", cs.Topic()).Msg("consumer exited with error")
+			}
+		}(c)
+	}
+}
+
+func (m *Manager) Shutdown() error {
+	m.logger.Info().Msg("consumer manager shutdown")
+	return nil
+}
+
+var Package = do.Package(
+	do.Lazy(NewManager),
+)
+

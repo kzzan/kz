@@ -1,0 +1,37 @@
+package server
+
+import (
+	"net/http"
+
+	"example/internal/middleware"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
+)
+
+func (s *Server) setupRoutes(logger *zerolog.Logger) {
+	s.engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	api := s.engine.Group("/api")
+	{
+		public := api.Group("")
+		{
+			public.POST("/login",    s.userHandler.Get)
+			public.POST("/register", s.userHandler.Create)
+		}
+
+		authed := api.Group("", middleware.Auth(logger))
+		{
+			users := authed.Group("/users")
+			{
+				users.GET("",        s.userHandler.List)
+				users.GET("/:id",    s.userHandler.Get)
+				users.POST("",       s.userHandler.Create)
+				users.PUT("/:id",    s.userHandler.Update)
+				users.DELETE("/:id", s.userHandler.Delete)
+			}
+		}
+	}
+}
