@@ -74,49 +74,49 @@ func (cg *ComponentGenerator) renderAndWrite(tmplPath, outRelPath string) error 
 func (cg *ComponentGenerator) GenerateModel() error {
 	return cg.renderAndWrite(
 		"templates/component/model.go.tmpl",
-		"internal/models/"+cg.SnakeName+"_model.go",
+		"internal/models/"+cg.SnakeName+".go",
 	)
 }
 
 func (cg *ComponentGenerator) GenerateMiddleware() error {
 	return cg.renderAndWrite(
 		"templates/component/middleware.go.tmpl",
-		"internal/middleware/"+cg.SnakeName+"_middleware.go",
+		"internal/middleware/"+cg.SnakeName+".go",
 	)
 }
 
 func (cg *ComponentGenerator) GenerateRepository() error {
 	return cg.renderAndWrite(
 		"templates/component/repository.go.tmpl",
-		"internal/repository/"+cg.SnakeName+"_repo.go",
+		"internal/repository/"+cg.SnakeName+".go",
 	)
 }
 
 func (cg *ComponentGenerator) GenerateService() error {
 	return cg.renderAndWrite(
 		"templates/component/service.go.tmpl",
-		"internal/service/"+cg.SnakeName+"_service.go",
+		"internal/service/"+cg.SnakeName+".go",
 	)
 }
 
 func (cg *ComponentGenerator) GenerateHandler() error {
 	return cg.renderAndWrite(
 		"templates/component/handler.go.tmpl",
-		"internal/handler/"+cg.SnakeName+"_handler.go",
+		"internal/handler/"+cg.SnakeName+".go",
 	)
 }
 
 func (cg *ComponentGenerator) GenerateCron() error {
 	return cg.renderAndWrite(
 		"templates/component/cron.go.tmpl",
-		"internal/cron/"+cg.SnakeName+"_job.go",
+		"internal/cron/"+cg.SnakeName+".go",
 	)
 }
 
 func (cg *ComponentGenerator) GenerateConsumer() error {
 	return cg.renderAndWrite(
 		"templates/component/consumer.go.tmpl",
-		"internal/consumer/"+cg.SnakeName+"_consumer.go",
+		"internal/consumer/"+cg.SnakeName+".go",
 	)
 }
 
