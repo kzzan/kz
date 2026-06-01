@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/kzzan/kz/pkg/generator"
 	"github.com/kzzan/kz/pkg/utils"
@@ -11,376 +14,434 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	rootCmd.AddCommand(newCmd, versionCmd)
+var version = "dev"
+
+type app struct {
+	quiet bool
 }
 
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+type exitError struct {
+	code int
+	err  error
+}
+
+func (e *exitError) Error() string {
+	return e.err.Error()
+}
+
+func (e *exitError) Unwrap() error {
+	return e.err
+}
+
+func Execute() int {
+	cmd := NewRootCmd()
+	if err := cmd.Execute(); err != nil {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), err)
+		return exitCode(err)
+	}
+	return 0
+}
+
+func NewRootCmd() *cobra.Command {
+	a := &app{}
+
+	rootCmd := &cobra.Command{
+		Use:           "kz",
+		Short:         "Generate Go project scaffolds and components",
+		Long:          "kz initializes Go service scaffolds and generates focused application components.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
+	}
+
+	rootCmd.PersistentFlags().BoolVarP(&a.quiet, "quiet", "q", false, "suppress progress output")
+
+	rootCmd.AddCommand(
+		a.newInitCmd(),
+		a.newGenerateCmd(),
+		a.newLegacyNewCmd(),
+		newVersionCmd(),
+	)
+
+	return rootCmd
+}
+
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print kz version",
+		Args:  noArgs(),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), version)
+			return err
+		},
 	}
 }
 
-var rootCmd = &cobra.Command{
-	Use:   "kz",
-	Short: "kz v1.0 - 现代化的 Go 项目脚手架生成工具",
-	Long: `kz v1.0 是一个强大的 Go 项目脚手架工具，用于快速初始化项目和生成代码组件。
+func (a *app) newInitCmd() *cobra.Command {
+	var force bool
 
-支持的命令：
-  kz new [project-name]          创建新项目
-  kz new all [name]              生成完整四层组件 + 自动注册
-  kz new handler [name]          生成 Handler + 注册到 package.go
-  kz new service [name]          生成 Service + 注册到 package.go
-  kz new repo [name]             生成 Repository + 注册到 package.go
-  kz new model [name]            生成 Model
-  kz new cron [name]             生成定时任务 + 注册到 cron/package.go
-  kz new consumer [name]         生成队列消费者 + 注册到 consumer/package.go
-  kz new middleware [name]       生成空中间件
-  kz version                     显示版本信息`,
-	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
-	},
-}
-
-var newCmd = &cobra.Command{
-	Use:   "new",
-	Short: "创建新项目或生成代码组件",
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			fmt.Println("用法: kz new <command> [args]")
-			fmt.Println("")
-			fmt.Println("Commands:")
-			fmt.Println("  [project-name]    创建新项目")
-			fmt.Println("  all [name]        生成完整四层组件（handler/service/repo/model）+ 自动注册")
-			fmt.Println("  handler [name]    生成 Handler + 注册到 internal/handler/package.go")
-			fmt.Println("  service [name]    生成 Service + 注册到 internal/service/package.go")
-			fmt.Println("  repo    [name]    生成 Repository + 注册到 internal/repository/package.go")
-			fmt.Println("  model   [name]    生成 Model")
-			fmt.Println("  cron    [name]    生成定时任务 + 注册到 internal/cron/package.go")
-			fmt.Println("  consumer [name]   生成队列消费者 + 注册到 internal/consumer/package.go")
-			fmt.Println("  middleware [name] 生成空中间件")
-			return
-		}
-
-		switch args[0] {
-		case "handler":
-			handleNewHandler(args[1:])
-		case "service":
-			handleNewService(args[1:])
-		case "repo":
-			handleNewRepo(args[1:])
-		case "model":
-			handleNewModel(args[1:])
-		case "all":
-			handleNewAll(args[1:])
-		case "cron":
-			handleNewCron(args[1:])
-		case "consumer":
-			handleNewConsumer(args[1:])
-		case "middleware":
-			handleNewMiddleware(args[1:])
-		default:
-			handleNewProject(args)
-		}
-	},
-}
-
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "显示版本信息",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("kz v1.0")
-		fmt.Println("A modern Go project scaffold generator")
-	},
-}
-
-func handleNewProject(args []string) {
-	projectName := ""
-	if len(args) > 0 {
-		projectName = args[0]
-	} else {
-		cwd, err := os.Getwd()
-		if err != nil {
-			exitWithError("获取当前目录失败", err)
-		}
-		projectName = filepath.Base(cwd)
+	cmd := &cobra.Command{
+		Use:   "init [directory]",
+		Short: "Initialize a scaffold in the current or target directory",
+		Long: strings.Join([]string{
+			"Initialize a Go service scaffold.",
+			"If no directory is given, kz writes into the current working directory.",
+		}, "\n"),
+		Args: maxArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.runInit(cmd, args, force)
+		},
 	}
 
-	if projectName == "" {
-		exitWithMsg("项目名称不能为空")
+	cmd.Flags().BoolVar(&force, "force", false, "allow initializing a non-empty directory")
+
+	return cmd
+}
+
+func (a *app) newGenerateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "generate",
+		Aliases: []string{"gen", "g"},
+		Short:   "Generate a component inside an existing kz project",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+
+	cmd.AddCommand(
+		a.newComponentCmd("all", "Generate model, repository, service, and handler", a.runGenerateAll),
+		a.newComponentCmd("handler", "Generate a handler and register routes", a.runGenerateHandler),
+		a.newComponentCmd("service", "Generate a service and register it", a.runGenerateService),
+		a.newComponentCmd("repo", "Generate a repository and register it", a.runGenerateRepo),
+		a.newComponentCmd("model", "Generate a model", a.runGenerateModel),
+		a.newComponentCmd("cron", "Generate a cron job and register it", a.runGenerateCron),
+		a.newComponentCmd("consumer", "Generate a consumer and register it", a.runGenerateConsumer),
+		a.newComponentCmd("middleware", "Generate a middleware template", a.runGenerateMiddleware),
+	)
+
+	return cmd
+}
+
+func (a *app) newLegacyNewCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "new [name]",
+		Short:  "Compatibility alias for init and generate",
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.runLegacyNew(cmd, args)
+		},
+	}
+}
+
+func (a *app) newComponentCmd(name, short string, run func(cmd *cobra.Command, componentName string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:   name + " <name>",
+		Short: short,
+		Args:  exactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd, args[0])
+		},
+	}
+}
+
+func (a *app) runInit(cmd *cobra.Command, args []string, force bool) error {
+	target := "."
+	if len(args) == 1 {
+		target = args[0]
+	}
+
+	projectPath, projectName, err := resolveProjectTarget(target)
+	if err != nil {
+		return usageError(err.Error())
 	}
 	if !utils.IsValidProjectName(projectName) {
-		exitWithMsg(fmt.Sprintf("项目名称 '%s' 无效，请使用字母、数字和下划线", projectName))
+		return usageError(fmt.Sprintf("invalid project name %q: use letters, digits, and underscores", projectName))
+	}
+	if err := ensureInitTarget(projectPath, force); err != nil {
+		return err
 	}
 
-	fmt.Printf("正在创建项目: %s\n", projectName)
+	a.logf(cmd.ErrOrStderr(), "initializing project in %s", projectPath)
 
-	if err := generator.NewProjectGenerator(projectName).GenerateProject(); err != nil {
-		exitWithError("创建项目失败", err)
+	if err := generator.NewProjectGenerator(projectName, projectPath).GenerateProject(); err != nil {
+		return runtimeError(fmt.Errorf("init project: %w", err))
 	}
 
-	fmt.Printf("\n✓ 项目 '%s' 创建成功！\n\n", projectName)
-	fmt.Println("后续步骤:")
-	fmt.Printf("  cd %s\n", projectName)
-	fmt.Println("  go mod tidy")
-	fmt.Println("  make build")
-	fmt.Println("\n生成新组件:")
-	fmt.Println("  kz new all order")
+	a.logf(cmd.ErrOrStderr(), "created scaffold for %s", projectName)
+	a.logf(cmd.ErrOrStderr(), "next: go mod tidy")
+
+	return nil
 }
 
-func handleNewHandler(args []string) {
-	componentName := requireComponentName(args, "handler")
-	requireProjectRoot()
+func (a *app) runGenerateHandler(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating handler %s", componentName)
 
-	fmt.Printf("正在生成 Handler: %s\n", componentName)
-
-	runSteps([]step{
+	return a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/3] 生成文件",
+			label: "write handler",
 			fn:    gen.GenerateHandler,
-			file:  fmt.Sprintf("internal/handler/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/handler/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[2/3] 注册到 package.go",
+			label: "register handler package",
 			fn:    gen.AppendHandlerToPackage,
 			file:  "internal/handler/package.go",
 		},
 		{
-			label: "[3/3] 追加路由",
+			label: "register routes",
 			fn:    gen.AppendHandlerToRoutes,
-			file:  "internal/server/routes.go + server.go",
+			file:  "internal/server/routes.go, internal/server/server.go",
 		},
 	})
-
-	fmt.Printf("\n✓ Handler '%s' 生成成功！\n", componentName)
 }
 
-func handleNewService(args []string) {
-	componentName := requireComponentName(args, "service")
-	requireProjectRoot()
+func (a *app) runGenerateService(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating service %s", componentName)
 
-	fmt.Printf("正在生成 Service: %s\n", componentName)
-
-	runSteps([]step{
+	return a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/2] 生成文件",
+			label: "write service",
 			fn:    gen.GenerateService,
-			file:  fmt.Sprintf("internal/service/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/service/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[2/2] 注册到 package.go",
+			label: "register service package",
 			fn:    gen.AppendServiceToPackage,
 			file:  "internal/service/package.go",
 		},
 	})
-
-	fmt.Printf("\n✓ Service '%s' 生成成功！\n", componentName)
 }
 
-func handleNewRepo(args []string) {
-	componentName := requireComponentName(args, "repo")
-	requireProjectRoot()
+func (a *app) runGenerateRepo(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating repository %s", componentName)
 
-	fmt.Printf("正在生成 Repository: %s\n", componentName)
-
-	runSteps([]step{
+	return a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/2] 生成文件",
+			label: "write repository",
 			fn:    gen.GenerateRepository,
-			file:  fmt.Sprintf("internal/repository/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/repository/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[2/2] 注册到 package.go",
+			label: "register repository package",
 			fn:    gen.AppendRepositoryToPackage,
 			file:  "internal/repository/package.go",
 		},
 	})
-
-	fmt.Printf("\n✓ Repository '%s' 生成成功！\n", componentName)
 }
 
-func handleNewModel(args []string) {
-	componentName := requireComponentName(args, "model")
-	requireProjectRoot()
+func (a *app) runGenerateModel(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating model %s", componentName)
 
-	fmt.Printf("正在生成 Model: %s\n", componentName)
-
-	runSteps([]step{
+	return a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/1] 生成文件",
+			label: "write model",
 			fn:    gen.GenerateModel,
-			file:  fmt.Sprintf("internal/models/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/models/%s.go", gen.SnakeName),
 		},
 	})
-
-	fmt.Printf("\n✓ Model '%s' 生成成功！\n", componentName)
 }
 
-func handleNewAll(args []string) {
-	componentName := requireComponentName(args, "all")
-	requireProjectRoot()
+func (a *app) runGenerateAll(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating component set %s", componentName)
 
-	fmt.Printf("正在为 '%s' 生成完整四层组件...\n\n", componentName)
-
-	runSteps([]step{
+	err = a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/8] 生成 Model",
+			label: "write model",
 			fn:    gen.GenerateModel,
-			file:  fmt.Sprintf("internal/models/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/models/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[2/8] 生成 Repository",
+			label: "write repository",
 			fn:    gen.GenerateRepository,
-			file:  fmt.Sprintf("internal/repository/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/repository/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[3/8] 生成 Service",
+			label: "write service",
 			fn:    gen.GenerateService,
-			file:  fmt.Sprintf("internal/service/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/service/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[4/8] 生成 Handler",
+			label: "write handler",
 			fn:    gen.GenerateHandler,
-			file:  fmt.Sprintf("internal/handler/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/handler/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[5/8] 注册 Repository",
+			label: "register repository package",
 			fn:    gen.AppendRepositoryToPackage,
 			file:  "internal/repository/package.go",
 		},
 		{
-			label: "[6/8] 注册 Service",
+			label: "register service package",
 			fn:    gen.AppendServiceToPackage,
 			file:  "internal/service/package.go",
 		},
 		{
-			label: "[7/8] 注册 Handler",
+			label: "register handler package",
 			fn:    gen.AppendHandlerToPackage,
 			file:  "internal/handler/package.go",
 		},
 		{
-			label: "[8/8] 追加路由",
+			label: "register routes",
 			fn:    gen.AppendHandlerToRoutes,
-			file:  "internal/server/routes.go + server.go",
+			file:  "internal/server/routes.go, internal/server/server.go",
 		},
 	})
+	if err != nil {
+		return err
+	}
 
-	fmt.Printf("\n✓ '%s' 完整四层组件生成成功！\n\n", componentName)
-	fmt.Println("后续步骤:")
-	fmt.Printf("  1. 编辑 internal/models/%s.go          定义数据模型\n", snakeName)
-	fmt.Printf("  2. 编辑 internal/repository/%s.go      实现数据访问\n", snakeName)
-	fmt.Printf("  3. 编辑 internal/service/%s.go         实现业务逻辑\n", snakeName)
-	fmt.Printf("  4. 编辑 internal/handler/%s.go         实现 HTTP 处理\n", snakeName)
+	a.logf(cmd.ErrOrStderr(), "edit the generated files to add domain logic")
+
+	return nil
 }
 
-func handleNewCron(args []string) {
-	componentName := requireComponentName(args, "cron")
-	requireProjectRoot()
+func (a *app) runGenerateCron(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating cron job %s", componentName)
 
-	fmt.Printf("正在生成 Cron Job: %s\n", componentName)
-
-	runSteps([]step{
+	return a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/4] 生成 Job 文件",
+			label: "write cron job",
 			fn:    gen.GenerateCron,
-			file:  fmt.Sprintf("internal/cron/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/cron/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[2/4] 确保 cron/package.go",
+			label: "ensure cron package",
 			fn:    gen.EnsureCronPackage,
 			file:  "internal/cron/package.go",
 		},
 		{
-			label: "[3/4] 注册 Job 到 Scheduler",
+			label: "register scheduler",
 			fn:    gen.AppendCronToScheduler,
 			file:  "internal/cron/package.go",
 		},
 		{
-			label: "[4/4] 注册 cron.Package 到 server",
+			label: "register server package",
 			fn:    gen.AppendCronPackageToServer,
 			file:  "internal/server/package.go",
 		},
 	})
-
-	fmt.Printf("\n✓ Cron Job '%s' 生成成功！\n\n", componentName)
 }
 
-func handleNewConsumer(args []string) {
-	componentName := requireComponentName(args, "consumer")
-	requireProjectRoot()
+func (a *app) runGenerateConsumer(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating consumer %s", componentName)
 
-	fmt.Printf("正在生成 Consumer: %s\n", componentName)
-
-	runSteps([]step{
+	return a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/4] 生成 Consumer 文件",
+			label: "write consumer",
 			fn:    gen.GenerateConsumer,
-			file:  fmt.Sprintf("internal/consumer/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/consumer/%s.go", gen.SnakeName),
 		},
 		{
-			label: "[2/4] 确保 consumer/package.go",
+			label: "ensure consumer package",
 			fn:    gen.EnsureConsumerPackage,
 			file:  "internal/consumer/package.go",
 		},
 		{
-			label: "[3/4] 注册 Consumer 到 Manager",
+			label: "register manager",
 			fn:    gen.AppendConsumerToManager,
 			file:  "internal/consumer/package.go",
 		},
 		{
-			label: "[4/4] 注册 consumer.Package 到 server",
+			label: "register server package",
 			fn:    gen.AppendConsumerPackageToServer,
 			file:  "internal/server/package.go",
 		},
 	})
-
-	fmt.Printf("\n✓ Consumer '%s' 生成成功！\n\n", componentName)
 }
 
-func handleNewMiddleware(args []string) {
-	componentName := requireComponentName(args, "middleware")
-	requireProjectRoot()
+func (a *app) runGenerateMiddleware(cmd *cobra.Command, componentName string) error {
+	gen, err := componentGenerator(componentName)
+	if err != nil {
+		return err
+	}
 
-	gen := generator.NewComponentGenerator(componentName)
-	snakeName := utils.ToSnakeCase(componentName)
-	pascalName := utils.ToPascalCase(componentName)
+	a.logf(cmd.ErrOrStderr(), "generating middleware %s", componentName)
 
-	fmt.Printf("正在生成 Middleware: %s\n", componentName)
-
-	runSteps([]step{
+	err = a.runSteps(cmd.ErrOrStderr(), []step{
 		{
-			label: "[1/1] 生成文件",
+			label: "write middleware",
 			fn:    gen.GenerateMiddleware,
-			file:  fmt.Sprintf("internal/middleware/%s.go", snakeName),
+			file:  fmt.Sprintf("internal/middleware/%s.go", gen.SnakeName),
 		},
 	})
+	if err != nil {
+		return err
+	}
 
-	fmt.Printf("\n✓ Middleware '%s' 生成成功！\n\n", componentName)
-	fmt.Println("后续步骤:")
-	fmt.Printf("  在 internal/server/server.go 中使用:\n")
-	fmt.Printf("  engine.Use(middleware.%s(logger))\n", pascalName)
+	a.logf(cmd.ErrOrStderr(), "register it in internal/server/server.go when needed")
+
+	return nil
+}
+
+func (a *app) runLegacyNew(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return a.runInit(cmd, nil, false)
+	}
+
+	switch args[0] {
+	case "all":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateAll)
+	case "handler":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateHandler)
+	case "service":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateService)
+	case "repo":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateRepo)
+	case "model":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateModel)
+	case "cron":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateCron)
+	case "consumer":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateConsumer)
+	case "middleware":
+		return singleComponentCompat(cmd, args[1:], a.runGenerateMiddleware)
+	default:
+		if len(args) != 1 {
+			return usageError(fmt.Sprintf("expected exactly one project directory, got %d", len(args)))
+		}
+		return a.runInit(cmd, args[:1], false)
+	}
 }
 
 type step struct {
@@ -389,45 +450,141 @@ type step struct {
 	file  string
 }
 
-func runSteps(steps []step) {
+func (a *app) runSteps(w io.Writer, steps []step) error {
 	for _, s := range steps {
-		fmt.Printf("  %s\n", s.label)
 		if err := s.fn(); err != nil {
-			fmt.Printf("  ✗ 失败: %v\n", err)
-			os.Exit(1)
+			return runtimeError(fmt.Errorf("%s: %w", s.label, err))
 		}
-		fmt.Printf("  ✓ %s\n", s.file)
+		a.logf(w, "created %s", s.file)
+	}
+	return nil
+}
+
+func (a *app) logf(w io.Writer, format string, args ...any) {
+	if a.quiet {
+		return
+	}
+	_, _ = fmt.Fprintf(w, format+"\n", args...)
+}
+
+func componentGenerator(componentName string) (*generator.ComponentGenerator, error) {
+	if !utils.IsValidComponentName(componentName) {
+		return nil, usageError(fmt.Sprintf("invalid component name %q: use letters, digits, and underscores", componentName))
+	}
+
+	projectRoot, err := utils.GetProjectRoot()
+	if err != nil {
+		return nil, usageError("run generate inside a kz project")
+	}
+	if !utils.DirectoryExists(filepath.Join(projectRoot, "internal")) {
+		return nil, usageError(fmt.Sprintf("%s is missing an internal directory", projectRoot))
+	}
+
+	return generator.NewComponentGenerator(componentName, projectRoot), nil
+}
+
+func resolveProjectTarget(target string) (string, string, error) {
+	cleaned := filepath.Clean(target)
+	if cleaned == "" {
+		return "", "", errors.New("project directory cannot be empty")
+	}
+
+	projectName := filepath.Base(cleaned)
+	if cleaned == "." {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", "", fmt.Errorf("read current directory: %w", err)
+		}
+		projectName = filepath.Base(cwd)
+	}
+
+	return cleaned, projectName, nil
+}
+
+func ensureInitTarget(projectPath string, force bool) error {
+	info, err := os.Stat(projectPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return runtimeError(fmt.Errorf("inspect target directory: %w", err))
+	}
+	if !info.IsDir() {
+		return usageError(fmt.Sprintf("%s exists and is not a directory", projectPath))
+	}
+	if force {
+		return nil
+	}
+
+	entries, err := os.ReadDir(projectPath)
+	if err != nil {
+		return runtimeError(fmt.Errorf("read target directory: %w", err))
+	}
+	if len(entries) > 0 {
+		return usageError(fmt.Sprintf("%s is not empty; rerun with --force to overwrite", projectPath))
+	}
+
+	return nil
+}
+
+func singleComponentCompat(cmd *cobra.Command, args []string, run func(cmd *cobra.Command, componentName string) error) error {
+	if len(args) != 1 {
+		return usageError(fmt.Sprintf("expected exactly one component name, got %d", len(args)))
+	}
+	return run(cmd, args[0])
+}
+
+func noArgs() cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) != 0 {
+			return usageError(fmt.Sprintf("%s accepts no arguments", cmd.CommandPath()))
+		}
+		return nil
 	}
 }
 
-func requireComponentName(args []string, cmd string) string {
-	if len(args) == 0 {
-		fmt.Printf("错误: 请指定组件名称\n")
-		fmt.Printf("用法: kz new %s <name>\n", cmd)
-		fmt.Printf("示例: kz new %s user\n", cmd)
-		os.Exit(1)
-	}
-	name := args[0]
-	if !utils.IsValidComponentName(name) {
-		exitWithMsg(fmt.Sprintf("组件名称 '%s' 无效，请使用字母、数字和下划线", name))
-	}
-	return name
-}
-
-func requireProjectRoot() {
-	if !utils.IsProjectRoot() {
-		fmt.Println("错误: 当前目录不是有效的项目根目录")
-		fmt.Println("请在项目根目录（含 go.mod）下运行此命令")
-		os.Exit(1)
+func exactArgs(n int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) != n {
+			return usageError(fmt.Sprintf("%s requires exactly %d argument(s)", cmd.CommandPath(), n))
+		}
+		return nil
 	}
 }
 
-func exitWithError(msg string, err error) {
-	fmt.Printf("错误: %s - %v\n", msg, err)
-	os.Exit(1)
+func maxArgs(n int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) > n {
+			return usageError(fmt.Sprintf("%s accepts at most %d argument(s)", cmd.CommandPath(), n))
+		}
+		return nil
+	}
 }
 
-func exitWithMsg(msg string) {
-	fmt.Printf("错误: %s\n", msg)
-	os.Exit(1)
+func usageError(message string) error {
+	return &exitError{
+		code: 2,
+		err:  errors.New(message),
+	}
+}
+
+func runtimeError(err error) error {
+	return &exitError{
+		code: 1,
+		err:  err,
+	}
+}
+
+func exitCode(err error) int {
+	var cliErr *exitError
+	if errors.As(err, &cliErr) {
+		return cliErr.code
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "unknown command") || strings.Contains(msg, "unknown flag") {
+		return 2
+	}
+
+	return 1
 }

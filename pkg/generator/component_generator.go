@@ -27,13 +27,17 @@ type ComponentGenerator struct {
 	ModuleName    string
 }
 
-func NewComponentGenerator(componentName string) *ComponentGenerator {
+func NewComponentGenerator(componentName, projectRoot string) *ComponentGenerator {
+	if projectRoot == "" {
+		projectRoot = "."
+	}
+
 	return &ComponentGenerator{
 		ComponentName: componentName,
 		PascalName:    utils.ToPascalCase(componentName),
 		SnakeName:     utils.ToSnakeCase(componentName),
-		ProjectRoot:   ".",
-		ModuleName:    utils.ReadModuleName("."),
+		ProjectRoot:   projectRoot,
+		ModuleName:    utils.ReadModuleName(projectRoot),
 	}
 }
 

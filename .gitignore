@@ -46,3 +46,7 @@ do-template-cli
 
 .direnv
 .gopath
+
+.codegraph
+.cache
+.cursor

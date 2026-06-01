@@ -23,10 +23,14 @@ type ProjectGenerator struct {
 	SnakeName   string
 }
 
-func NewProjectGenerator(projectName string) *ProjectGenerator {
+func NewProjectGenerator(projectName, projectPath string) *ProjectGenerator {
+	if projectPath == "" {
+		projectPath = projectName
+	}
+
 	return &ProjectGenerator{
 		ProjectName: projectName,
-		ProjectPath: projectName,
+		ProjectPath: projectPath,
 		PascalName:  utils.ToPascalCase(projectName),
 		SnakeName:   utils.ToSnakeCase(projectName),
 	}
@@ -131,13 +135,7 @@ func (pg *ProjectGenerator) GenerateProject() error {
 }
 
 func (pg *ProjectGenerator) generateDefaultComponents() error {
-	cg := &ComponentGenerator{
-		ComponentName: "user",
-		PascalName:    utils.ToPascalCase("user"),
-		SnakeName:     utils.ToSnakeCase("user"),
-		ProjectRoot:   pg.ProjectPath,
-		ModuleName:    pg.SnakeName,
-	}
+	cg := NewComponentGenerator("user", pg.ProjectPath)
 	return cg.runSteps([]step{
 		{"Model", cg.GenerateModel},
 		{"Repository", cg.GenerateRepository},

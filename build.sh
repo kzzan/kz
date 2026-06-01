@@ -1,8 +1,11 @@
 #!/bin/bash
 
-VERSION="v1.0.0"
-BINARY_NAME="mk"
+set -euo pipefail
+
+VERSION="${VERSION:-v1.0.0}"
+BINARY_NAME="kz"
 OUTPUT_DIR="./dist"
+LDFLAGS="-s -w -X github.com/kzzan/kz/pkg/cli.version=${VERSION}"
 
 PLATFORMS=(
     "darwin/amd64"
@@ -24,14 +27,8 @@ for platform in "${PLATFORMS[@]}"; do
     fi
     
     echo "构建 $GOOS/$GOARCH..."
-    GOOS=$GOOS GOARCH=$GOARCH go build -o "$BINARY_PATH" -ldflags="-s -w" ./cmd/
-    
-    if [ $? -eq 0 ]; then
-        echo "✓ 构建成功: $BINARY_PATH"
-    else
-        echo "✗ 构建失败: $GOOS/$GOARCH"
-        exit 1
-    fi
+    GOOS=$GOOS GOARCH=$GOARCH go build -trimpath -ldflags="$LDFLAGS" -o "$BINARY_PATH" ./
+    echo "✓ 构建成功: $BINARY_PATH"
 done
 
 echo "所有平台构建完成！文件位置: $OUTPUT_DIR"

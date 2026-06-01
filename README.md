@@ -6,7 +6,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> 现代化的 Go 项目脚手架生成工具，可以一条命令生成完整四层架构代码基于各组件的服务依赖注入，不用费劲心思纠结代码结构了。
+> 面向脚本和组合使用的 Go 脚手架工具：`init` 负责初始化项目，`generate` 负责生成单一组件或组件集合。
 
 ---
 
@@ -27,42 +27,54 @@ export PATH=$PATH:$(go env GOPATH)/bin
 ## 快速开始
 
 ```bash
-# 1. 创建新项目
-kz new myapp
+# 1. 创建新项目目录并初始化
+kz init myapp
 cd myapp
 
 # 2. 安装依赖
 go mod tidy
 
 # 3. 一键生成完整四层组件
-kz new all order
+kz generate all order
 ```
 
 ---
 
 ## 命令一览
 
-### `kz new [project-name]` — 创建新项目
+### `kz init [directory]` — 初始化项目
 
 ```bash
-kz new myapp
+# 在新目录中初始化
+kz init myapp
+
+# 在当前目录中初始化
+kz init .
 ```
 
-在当前目录生成完整项目骨架，包含：
+行为说明：
+
+- 只负责创建项目骨架，不承担组件生成
+- 默认要求目标目录为空；如需覆盖现有目录，显式传 `--force`
+- 不传目录时，默认初始化当前目录
+
+生成内容包括：
 
 - 完整目录结构（handler / service / repository / model / cron / consumer / middleware）
-- 依赖注入配置（[samber/do v2](https://github.com/samber/do/v2)）
-- PostgreSQL + Redis + 消息队列 开箱即用
-- 内置 `user` 示例组件
+- 基于 [samber/do v2](https://github.com/samber/do/v2) 的依赖注入入口
+- PostgreSQL、Redis、消息队列相关基础包
+- `user` 示例组件
 - `Makefile`、`docker-compose.yml`、`.env.example`
 
 ---
 
-### `kz new all [name]` — 生成完整四层组件
+### `kz generate all [name]` — 生成完整业务组件
 
 ```bash
-kz new all order
+kz generate all order
 ```
+
+`generate` 子命令会自动向上查找项目根目录，所以在项目任意子目录执行都可以。
 
 一条命令完成 8 个步骤：
 
@@ -79,10 +91,10 @@ kz new all order
 
 ---
 
-### `kz new handler [name]` — 单独生成 Handler
+### `kz generate handler [name]` — 生成 Handler
 
 ```bash
-kz new handler order
+kz generate handler order
 ```
 
 - 生成 `internal/handler/order.go`
@@ -92,10 +104,10 @@ kz new handler order
 
 ---
 
-### `kz new service [name]` — 单独生成 Service
+### `kz generate service [name]` — 生成 Service
 
 ```bash
-kz new service order
+kz generate service order
 ```
 
 - 生成 `internal/service/order.go`
@@ -103,10 +115,10 @@ kz new service order
 
 ---
 
-### `kz new repo [name]` — 单独生成 Repository
+### `kz generate repo [name]` — 生成 Repository
 
 ```bash
-kz new repo order
+kz generate repo order
 ```
 
 - 生成 `internal/repository/order.go`
@@ -114,10 +126,10 @@ kz new repo order
 
 ---
 
-### `kz new model [name]` — 生成 Model
+### `kz generate model [name]` — 生成 Model
 
 ```bash
-kz new model order
+kz generate model order
 ```
 
 - 生成 `internal/models/order.go`
@@ -125,10 +137,10 @@ kz new model order
 
 ---
 
-### `kz new cron [name]` — 生成定时任务
+### `kz generate cron [name]` — 生成定时任务
 
 ```bash
-kz new cron cleanExpired
+kz generate cron cleanExpired
 ```
 
 - 生成 `internal/cron/clean_expired.go`（默认 `@every 1m`）
@@ -143,10 +155,10 @@ scheduler.Start()
 
 ---
 
-### `kz new consumer [name]` — 生成消息队列消费者
+### `kz generate consumer [name]` — 生成消息队列消费者
 
 ```bash
-kz new consumer orderPaid
+kz generate consumer orderPaid
 ```
 
 - 生成 `internal/consumer/order_paid.go`（含 Topic / Start / handle 方法）
@@ -161,10 +173,10 @@ manager.Start(ctx)
 
 ---
 
-### `kz new middleware [name]` — 生成中间件
+### `kz generate middleware [name]` — 生成中间件
 
 ```bash
-kz new middleware rateLimit
+kz generate middleware rateLimit
 ```
 
 - 生成 `internal/middleware/rate_limit.go` 空模板
@@ -172,6 +184,16 @@ kz new middleware rateLimit
   ```go
   engine.Use(middleware.RateLimit(logger))
   ```
+
+---
+
+### 兼容别名
+
+旧用法 `kz new ...` 仍可用，但建议迁移到新的命令语义：
+
+- `kz new myapp` -> `kz init myapp`
+- `kz new all order` -> `kz generate all order`
+- `kz new handler order` -> `kz generate handler order`
 
 ---
 

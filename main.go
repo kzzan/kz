@@ -1,9 +1,11 @@
 package main
 
 import (
+	"os"
+
 	"github.com/kzzan/kz/pkg/cli"
 )
 
 func main() {
-	cli.Execute()
+	os.Exit(cli.Execute())
 }

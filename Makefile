@@ -3,10 +3,11 @@
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 VERSION ?= v1.0.0
-BINARY_NAME = mk
+LDFLAGS := -X github.com/kzzan/kz/pkg/cli.version=$(VERSION)
+BINARY_NAME = kz
 
 help:
-	@echo "mk - Go API 脚手架工具"
+	@echo "kz - Go project scaffold generator"
 	@echo ""
 	@echo "可用命令:"
 	@echo "  make install     - 安装依赖"
@@ -22,11 +23,11 @@ install:
 
 build:
 	@echo "构建 $(BINARY_NAME)..."
-	go build -o bin/$(BINARY_NAME) ./
+	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY_NAME) ./
 
 dev: install
 	@echo "以开发模式运行..."
-	go run ./main.go
+	go run ./
 
 test:
 	@echo "运行测试..."
